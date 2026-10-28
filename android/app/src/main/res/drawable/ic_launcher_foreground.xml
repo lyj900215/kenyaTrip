@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Setting sun -->
+    <path
+        android:fillColor="@color/launcher_sun"
+        android:pathData="M54,30a20,20 0,1 1,-0.01 0z" />
+    <!-- Savanna horizon -->
+    <path
+        android:fillColor="@color/launcher_tree"
+        android:pathData="M24,66 L84,66 L84,70 L24,70 Z" />
+    <!-- Acacia canopy -->
+    <path
+        android:fillColor="@color/launcher_tree"
+        android:pathData="M34,46 C40,40 50,40 56,43 C62,40 72,41 76,46 C70,49 40,50 34,46 Z" />
+    <!-- Acacia trunk -->
+    <path
+        android:fillColor="@color/launcher_tree"
+        android:pathData="M54,47 L56,47 L58,66 L52,66 Z M55,52 L47,47 L48,46 L56,51 Z M56,54 L64,47 L65,48 L57,55 Z" />
+</vector>
