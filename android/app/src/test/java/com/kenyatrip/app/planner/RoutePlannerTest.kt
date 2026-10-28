@@ -145,6 +145,8 @@ class RoutePlannerTest {
         assertTrue(results.isNotEmpty())
         results.forEach { itn ->
             assertTrue(itn.stops.any { it.placeId == "yiwu" } && itn.stops.any { it.placeId == "guilin" })
+            assertTrue(itn.components.any { it.refId == "gl_li_river" })
+            assertTrue(itn.days.flatMap { it.items }.any { it.type == ItemType.TRAIN })
             val first = itn.days.first().items.first { it.type == ItemType.FLIGHT }
             val last = itn.days.last().items.last { it.type == ItemType.FLIGHT }
             assertTrue(first.title.en, listOf("Guangzhou", "Shanghai", "Beijing").any { first.title.en.contains("Arrive in $it") })

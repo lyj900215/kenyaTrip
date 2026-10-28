@@ -249,7 +249,8 @@ class ItineraryBuilder(
                 val styleMatch = a.styles.any { it in req.styles }
                 val fitsKids = minChildAge == null || a.minAge <= minChildAge || must
                 val businessOk = a.minAge < 18 || TravelStyle.BUSINESS in req.styles || must
-                (must || styleMatch || (a.default && a.slot != Slot.FULL_DAY) || (a.default && req.styles.isEmpty())) &&
+                val defaultOk = a.default && (a.slot != Slot.FULL_DAY || req.styles.isEmpty() || place.id in req.mustPlaces)
+                (must || styleMatch || defaultOk) &&
                     fitsKids && businessOk
             }
             .sortedWith(compareByDescending<Activity> { it.id in req.mustActivities }.thenBy { it.slot != Slot.FULL_DAY })
@@ -270,7 +271,11 @@ class ItineraryBuilder(
         }
         return ItineraryItem(
             "%02d:%02d".format(startHour.toInt(), ((startHour % 1) * 60).roundToInt()),
-            ItemType.TRANSFER,
+            when (edge.mode) {
+                TransportMode.DRIVE -> ItemType.TRANSFER
+                TransportMode.FLIGHT -> ItemType.DOMESTIC_FLIGHT
+                TransportMode.TRAIN -> ItemType.TRAIN
+            },
             Text("$zhMode ${from.name.zh} → ${to.name.zh}", "$enMode ${from.name.en} → ${to.name.en}"),
             Text("约 $hours 小时", "About $hours h"),
         )

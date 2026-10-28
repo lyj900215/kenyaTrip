@@ -78,7 +78,8 @@ data class BookableComponent(
     val tier: Tier? = null,
 )
 
-enum class ItemType { FLIGHT, TRANSFER, GAME_DRIVE, ACTIVITY, STAY, MEAL, FREE, BUSINESS }
+/** FLIGHT is the international flight; domestic legs use TRANSFER (road), TRAIN or DOMESTIC_FLIGHT. */
+enum class ItemType { FLIGHT, TRANSFER, TRAIN, DOMESTIC_FLIGHT, GAME_DRIVE, ACTIVITY, STAY, MEAL, FREE, BUSINESS }
 
 data class ItineraryItem(
     val time: String,

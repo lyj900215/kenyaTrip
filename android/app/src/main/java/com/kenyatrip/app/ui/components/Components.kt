@@ -118,6 +118,8 @@ fun VSpace(h: Int) = Spacer(Modifier.padding(top = h.dp))
 fun itemIcon(type: ItemType): ImageVector = when (type) {
     ItemType.FLIGHT -> Icons.Filled.Flight
     ItemType.TRANSFER -> Icons.Filled.DirectionsCar
+    ItemType.TRAIN -> Icons.Filled.Train
+    ItemType.DOMESTIC_FLIGHT -> Icons.Filled.Flight
     ItemType.GAME_DRIVE -> Icons.Filled.Pets
     ItemType.ACTIVITY -> Icons.Filled.LocalActivity
     ItemType.STAY -> Icons.Filled.Hotel
