@@ -116,7 +116,7 @@ fun ItineraryScreen(
                         OutlinedTextField(
                             value = edit,
                             onValueChange = { edit = it },
-                            placeholder = { Text(t(S.aiAdjustHint)) },
+                            placeholder = { Text(t(if (itinerary.request.destination == Destination.KENYA) S.aiAdjustHint else S.aiAdjustHintChina)) },
                             modifier = Modifier.weight(1f).testTag("modify-input"),
                             singleLine = true,
                             shape = RoundedCornerShape(14.dp),
@@ -175,7 +175,7 @@ fun ItineraryScreen(
                 SectionCard(title = t(S.priceBreakdown)) {
                     itinerary.components.forEach { c ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconBadge(componentIcon(c.type), MaterialTheme.colorScheme.primary)
+                            IconBadge(componentIcon(c.type, c.supplier), MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(10.dp))
                             Text(t(c.title), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                             Text(Money.format(c.priceUsd, currency), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)

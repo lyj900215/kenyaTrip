@@ -133,7 +133,7 @@ fun TripDetailScreen(trip: TripRecord, onToggle: (String) -> Unit, padding: Padd
             SectionCard(title = t(S.bookings)) {
                 trip.legs.forEach { leg ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconBadge(componentIcon(ComponentType.valueOf(leg.type)), MaterialTheme.colorScheme.primary)
+                        IconBadge(componentIcon(ComponentType.valueOf(leg.type), leg.supplier), MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text(leg.title.get(lang), style = MaterialTheme.typography.bodyMedium)

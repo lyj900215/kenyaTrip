@@ -87,6 +87,18 @@ class ItineraryBuilder(
 
     private data class Schedule(val days: List<ItineraryDay>, val activityDays: Map<String, Int>)
 
+    private fun arrivalAirport(req: TripRequest, route: RouteSkeleton): Place {
+        if (req.destination == Destination.KENYA) return kb.gateway(req.destination)
+        val first = route.stops.first().first
+        return kb.place(route.arrival?.other(first) ?: first)
+    }
+
+    private fun departureAirport(req: TripRequest, route: RouteSkeleton): Place {
+        if (req.destination == Destination.KENYA) return kb.gateway(req.destination)
+        val last = route.stops.last().first
+        return kb.place(route.departure?.other(last) ?: last)
+    }
+
     private fun schedule(req: TripRequest, route: RouteSkeleton, stops: List<Stop>, start: LocalDate): Schedule {
         val dest = req.destination
         val dayItems = MutableList(req.days) { mutableListOf<ItineraryItem>() }
@@ -95,7 +107,7 @@ class ItineraryBuilder(
         val origin = originName(req)
 
         val firstPlace = kb.place(stops.first().placeId)
-        val arrivalAirport = if (dest == Destination.KENYA) kb.gateway(dest) else firstPlace
+        val arrivalAirport = arrivalAirport(req, route)
         dayItems[0] += if (dest == Destination.KENYA) {
             ItineraryItem(
                 "06:30", ItemType.FLIGHT,
@@ -116,7 +128,11 @@ class ItineraryBuilder(
             val edgeIn = if (index == 0) route.arrival else route.between[index - 1]
             val lodge = stop.lodgeId?.let { kb.lodge(it) }
             val arrivalDay = day
-            val earliest = if (arrivalDay == 0) 9.0 else 8.0
+            val earliest = when {
+                arrivalDay == 0 && dest == Destination.CHINA -> 15.0
+                arrivalDay == 0 -> 9.0
+                else -> 8.0
+            }
             var readyAt = earliest
             if (edgeIn != null) {
                 val from = kb.place(edgeIn.other(place.id))
@@ -133,6 +149,13 @@ class ItineraryBuilder(
                     place.highlight,
                 )
             } else if (!isGameDrivePlace(place) && readyAt <= 17.0) {
+                if (readyAt <= 13.0) {
+                    queue.firstOrNull { it.slot == Slot.AFTERNOON || it.slot == Slot.MORNING }?.let {
+                        dayItems[arrivalDay] += activityItem("14:30", it)
+                        val count = activityDays.merge(it.id, 1, Int::plus) ?: 1
+                        if (count >= it.maxDays) queue.remove(it)
+                    }
+                }
                 queue.firstOrNull { it.slot == Slot.EVENING }?.let {
                     dayItems[arrivalDay] += activityItem("19:00", it)
                     activityDays.merge(it.id, 1, Int::plus)
@@ -156,11 +179,15 @@ class ItineraryBuilder(
         val last = req.days - 1
         val lastPlace = kb.place(stops.last().placeId)
         dayBase[last] = lastPlace.name
-        val departureAirport = if (dest == Destination.KENYA) kb.gateway(dest) else lastPlace
+        val departureAirport = departureAirport(req, route)
         var flightTime = if (dest == Destination.KENYA) "21:30" else "13:00"
         route.departure?.let { edge ->
             dayItems[last] += transferItem(edge, lastPlace, departureAirport, 8.0)
             if (edge.mode == TransportMode.DRIVE && edge.hours > 4) flightTime = "23:30"
+            if (dest == Destination.CHINA) {
+                val departHour = ceil(8.0 + edge.hours + 3.0)
+                flightTime = "%02d:00".format(departHour.toInt())
+            }
         }
         if (dest == Destination.KENYA && route.departure == null) {
             dayItems[last] += ItineraryItem(
@@ -270,8 +297,8 @@ class ItineraryBuilder(
         val pax = req.travelers
 
         val flightRates = kb.flights.getValue(req.destination)
-        val firstAirport = if (req.destination == Destination.KENYA) kb.gateway(req.destination) else kb.place(stops.first().placeId)
-        val lastAirport = if (req.destination == Destination.KENYA) kb.gateway(req.destination) else kb.place(stops.last().placeId)
+        val firstAirport = arrivalAirport(req, route)
+        val lastAirport = departureAirport(req, route)
         val viaHubFactor = if (firstAirport.id != kb.gateway(req.destination).id || lastAirport.id != firstAirport.id) 1.05 else 1.0
         val seasonFactor = if (req.month in flightRates.peakMonths) flightRates.peakMultiplier else 1.0
         val perAdultFlight = flightRates.roundTripUsd * seasonFactor * viaHubFactor
@@ -291,13 +318,14 @@ class ItineraryBuilder(
         )
 
         val nightsBefore = stops.runningFold(0) { acc, s -> acc + s.nights }
-        val datedEdges = listOfNotNull(route.arrival?.let { it to 0 }) +
-            route.between.mapIndexed { k, e -> e to nightsBefore[k + 1] } +
-            listOfNotNull(route.departure?.let { it to req.days - 1 })
-        datedEdges.forEachIndexed { i, (edge, dayOffset) ->
+        val lastStopId = stops.last().placeId
+        val datedEdges = listOfNotNull(route.arrival?.let { Triple(it, stops.first().placeId, 0) }) +
+            route.between.mapIndexed { k, e -> Triple(e, stops[k + 1].placeId, nightsBefore[k + 1]) } +
+            listOfNotNull(route.departure?.let { Triple(it, it.other(lastStopId), req.days - 1) })
+        datedEdges.forEachIndexed { i, (edge, toId, dayOffset) ->
             if (edge.mode == TransportMode.DRIVE) return@forEachIndexed
-            val from = kb.place(edge.a)
-            val to = kb.place(edge.b)
+            val from = kb.place(edge.other(toId))
+            val to = kb.place(toId)
             val cost = edge.pricePerPersonUsd * pax
             val (zh, en) = if (edge.mode == TransportMode.FLIGHT) "内陆航班" to "Domestic flight" else "高铁" to "High-speed rail"
             result += BookableComponent(

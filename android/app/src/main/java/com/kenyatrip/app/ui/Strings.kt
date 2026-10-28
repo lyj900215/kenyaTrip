@@ -73,6 +73,7 @@ object S {
     val travelersUnit = Text("人", "travellers")
     val aiAdjust = Text("让 AI 调整行程", "Ask AI to adjust")
     val aiAdjustHint = Text("例如：轻松一点 / 加热气球 / 不去安博塞利", "e.g. more relaxed / add balloon / skip Amboseli")
+    val aiAdjustHintChina = Text("例如：轻松一点 / 加上桂林 / 不去深圳", "e.g. more relaxed / add Guilin / skip Shenzhen")
     val whyThisRoute = Text("推荐理由", "Why this route")
     val notices = Text("出行提醒", "Before you go")
     val dayPlan = Text("每日安排", "Day by day")

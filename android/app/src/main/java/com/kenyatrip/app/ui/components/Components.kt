@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,7 +55,7 @@ fun SectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = container),
+        colors = CardDefaults.cardColors(containerColor = container.compositeOver(MaterialTheme.colorScheme.surface)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -125,9 +126,11 @@ fun itemIcon(type: ItemType): ImageVector = when (type) {
     ItemType.BUSINESS -> Icons.Filled.BusinessCenter
 }
 
-fun componentIcon(type: ComponentType): ImageVector = when (type) {
+fun componentIcon(type: ComponentType, supplier: String = ""): ImageVector = when (type) {
     ComponentType.FLIGHT -> Icons.Filled.Flight
-    ComponentType.DOMESTIC_TRANSPORT -> Icons.Filled.Train
+    ComponentType.DOMESTIC_TRANSPORT ->
+        if (supplier.contains("airline", ignoreCase = true)) Icons.Filled.Flight
+        else Icons.Filled.Train
     ComponentType.STAY -> Icons.Filled.Hotel
     ComponentType.GROUND -> Icons.Filled.AirportShuttle
     ComponentType.PARK_FEES -> Icons.Filled.Park

@@ -180,12 +180,12 @@ class RequestParser(
         Regex("(\\d{4,6})\\s*(元|块|rmb|cny)").find(lower)?.let {
             return split(toUsd(it.groupValues[1].toDouble(), Currency.CNY), defaultPerPerson = true)
         }
-        Regex("(?:ksh|kes)\\s*(\\d[\\d,]*)\\s*(k)?|(\\d[\\d,]*)\\s*(k)?\\s*(?:ksh|kes|shillings)").find(lower)?.let { m ->
+        Regex("(?:ksh|kes)\\s*(\\d[\\d,]*)\\s*(k)?|(\\d[\\d,]*)\\s*(k)?\\s*(?:ksh|kes|shillings|肯尼亚先令|肯先令|先令)").find(lower)?.let { m ->
             val raw = (m.groupValues[1].ifEmpty { m.groupValues[3] }).replace(",", "").toDouble()
             val k = m.groupValues[2].isNotEmpty() || m.groupValues[4].isNotEmpty()
             return split(toUsd(if (k) raw * 1000 else raw, Currency.KES), defaultPerPerson = true)
         }
-        Regex("\\$\\s*(\\d[\\d,]*)\\s*(k)?|(\\d[\\d,]*)\\s*(k)?\\s*(?:usd|dollars)").find(lower)?.let { m ->
+        Regex("\\$\\s*(\\d[\\d,]*)\\s*(k)?|(\\d[\\d,]*)\\s*(k)?\\s*(?:usd|dollars|美元|美金)").find(lower)?.let { m ->
             val raw = (m.groupValues[1].ifEmpty { m.groupValues[3] }).replace(",", "").toDouble()
             val k = m.groupValues[2].isNotEmpty() || m.groupValues[4].isNotEmpty()
             return split((if (k) raw * 1000 else raw).roundToInt(), defaultPerPerson = true)

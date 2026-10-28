@@ -106,17 +106,28 @@ class RoutePlanner(
             }
             dfs(emptyList(), emptyList(), req.nights - gatewayNights)
         } else {
+            // Cities without international flights are reached by a same-day transfer from the nearest hub.
+            val hubs = kb.placesIn(dest).filter { it.internationalAirport && it.id !in req.avoidPlaces }
+            val hubLinks = candidates.filter { !it.internationalAirport }.associate { p ->
+                p.id to hubs.mapNotNull { kb.bestEdge(p.id, it.id, maxDrive) }.minByOrNull { it.hours }
+            }
+            fun reachable(placeId: String) = kb.place(placeId).internationalAirport || hubLinks[placeId] != null
             fun dfs(seq: List<Pair<String, Int>>, edges: List<Edge>, remaining: Int) {
                 if (remaining == 0) {
-                    if (seq.isEmpty() || !kb.place(seq.last().first).internationalAirport) return
-                    val route = RouteSkeleton(seq, arrival = null, between = edges, departure = null)
+                    if (seq.isEmpty() || !reachable(seq.last().first)) return
+                    val route = RouteSkeleton(
+                        seq,
+                        arrival = hubLinks[seq.first().first],
+                        between = edges,
+                        departure = hubLinks[seq.last().first],
+                    )
                     if (satisfiesMust(req, route)) results += route
                     return
                 }
                 if (seq.size >= maxStops) return
                 for (p in candidates) {
                     if (seq.any { it.first == p.id }) continue
-                    if (seq.isEmpty() && !p.internationalAirport) continue
+                    if (seq.isEmpty() && !reachable(p.id)) continue
                     val prev = seq.lastOrNull()
                     val edge = prev?.let { kb.bestEdge(it.first, p.id, maxDrive) }
                     if (prev != null && edge == null) continue
@@ -148,13 +159,21 @@ class RoutePlanner(
         route.stops.forEach { (placeId, nights) ->
             val p = kb.place(placeId)
             val affinity = 1.0 + req.styles.sumOf { p.affinity[it] ?: 0.0 } + if (placeId in req.mustPlaces) 0.5 else 0.0
-            val weight = if (p.kind == com.kenyatrip.app.core.model.PlaceKind.GATEWAY) 0.5 else 1.0
+            val weight = when {
+                p.kind == com.kenyatrip.app.core.model.PlaceKind.GATEWAY -> 0.5
+                // A beach extension only earns full credit when the traveller signals interest in it.
+                p.kind == com.kenyatrip.app.core.model.PlaceKind.BEACH && placeId !in req.mustPlaces &&
+                    req.styles.isNotEmpty() && req.styles.none { (p.affinity[it] ?: 0.0) > 0.0 } -> 0.6
+                else -> 1.0
+            }
             experience += p.season(req.month) * NIGHT_CURVE[nights.coerceAtMost(NIGHT_CURVE.lastIndex)] * affinity * weight
         }
         val relaxed = relaxedLike(req)
         val overland = route.allEdges.filter { it.mode != TransportMode.FLIGHT }.sumOf { it.hours }
         val flights = route.allEdges.count { it.mode == TransportMode.FLIGHT }
-        val fatigue = overland * (if (relaxed) 1.2 else 0.7) + flights * 1.0 + (route.stops.size - 1) * (if (relaxed) 2.0 else 1.0)
+        val airportTransfers = if (req.destination == Destination.CHINA) listOfNotNull(route.arrival, route.departure).size else 0
+        val fatigue = overland * (if (relaxed) 1.2 else 0.7) + flights * 1.0 + (route.stops.size - 1) * (if (relaxed) 2.0 else 1.0) +
+            airportTransfers * 1.5
         val budgetPenalty = if (perPersonUsd == null) 0.0 else req.budgetPerPersonUsd?.let { budget ->
             val over = perPersonUsd.toDouble() / budget - 1.0
             if (over > 0) over * 60 else 0.0
@@ -192,12 +211,26 @@ class RoutePlanner(
             "${req.month} 月是${best.name.zh}的好季节（${best.season(req.month)}/10）：${best.highlight.zh}",
             "${monthName(req.month)} is a great time for ${best.name.en} (${best.season(req.month)}/10): ${best.highlight.en}",
         )
-        val longest = route.allEdges.filter { it.mode != TransportMode.FLIGHT }.maxOfOrNull { it.hours } ?: 0.0
+        val longestDrive = route.allEdges.filter { it.mode == TransportMode.DRIVE }.maxOfOrNull { it.hours }
+        val longestTrain = route.allEdges.filter { it.mode == TransportMode.TRAIN }.maxOfOrNull { it.hours }
         val flights = route.allEdges.count { it.mode == TransportMode.FLIGHT }
-        out += Text(
-            "单日最长陆路 ${fmt(longest)} 小时（上限 ${fmt(maxDrive)} 小时）" + if (flights > 0) "，含 $flights 段内陆航班减少长途奔波" else "",
-            "Longest overland leg ${fmt(longest)} h (limit ${fmt(maxDrive)} h)" + if (flights > 0) ", with $flights domestic flight(s) to cut travel time" else "",
-        )
+        val zh = mutableListOf<String>()
+        val en = mutableListOf<String>()
+        longestDrive?.let {
+            zh += "单日最长车程 ${fmt(it)} 小时（上限 ${fmt(maxDrive)} 小时）"
+            en += "Longest drive ${fmt(it)} h (limit ${fmt(maxDrive)} h)"
+        }
+        longestTrain?.let {
+            zh += "最长高铁 ${fmt(it)} 小时，座位舒适可休息"
+            en += "longest high-speed train ${fmt(it)} h in a comfortable seat"
+        }
+        if (flights > 0) {
+            zh += "含 $flights 段内陆航班减少长途奔波"
+            en += "$flights domestic flight(s) to cut travel time"
+        }
+        if (zh.isNotEmpty()) {
+            out += Text(zh.joinToString("，"), en.joinToString(", ").replaceFirstChar { it.uppercase() })
+        }
         val currency = Currency.forDestination(req.destination)
         val pp = Money.format(it.pricePerPersonUsd, currency)
         val budgetText = req.budgetPerPersonUsd?.let { b ->

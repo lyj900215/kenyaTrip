@@ -152,7 +152,7 @@ fun BookingScreen(
             val legs = booking.legs.ifEmpty { itinerary.components.map { com.kenyatrip.app.core.booking.BookingLeg(it) } }
             legs.forEach { leg ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconBadge(componentIcon(leg.component.type), MaterialTheme.colorScheme.primary)
+                    IconBadge(componentIcon(leg.component.type, leg.component.supplier), MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text(t(leg.component.title), style = MaterialTheme.typography.bodyMedium)

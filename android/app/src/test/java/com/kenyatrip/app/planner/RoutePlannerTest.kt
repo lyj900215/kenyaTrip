@@ -3,6 +3,7 @@ package com.kenyatrip.app.planner
 import com.kenyatrip.app.TestFixtures
 import com.kenyatrip.app.core.model.ComponentType
 import com.kenyatrip.app.core.model.Destination
+import com.kenyatrip.app.core.model.ItemType
 import com.kenyatrip.app.core.model.Severity
 import com.kenyatrip.app.core.model.Tier
 import com.kenyatrip.app.core.model.TransportMode
@@ -88,8 +89,11 @@ class RoutePlannerTest {
         assertEquals(10, itn.startDate.monthValue)
         assertTrue(itn.name.en.startsWith("Canton Fair"))
         assertTrue(itn.components.any { it.refId == "canton_fair" })
-        assertTrue(TestFixtures.kb.place(itn.stops.first().placeId).internationalAirport)
-        assertTrue(TestFixtures.kb.place(itn.stops.last().placeId).internationalAirport)
+        val first = itn.stops.first().placeId
+        val last = itn.stops.last().placeId
+        assertTrue(TestFixtures.kb.place(first).internationalAirport || itn.transfers.first().let { it.a == first || it.b == first })
+        assertTrue(TestFixtures.kb.place(last).internationalAirport || itn.transfers.last().let { it.a == last || it.b == last })
+        assertTrue(itn.days.last().items.any { it.type == ItemType.FLIGHT && it.title.en.startsWith("Fly home from") })
         assertTrue(itn.warnings.any { it.text.en.contains("Chinese visa") })
     }
 
@@ -100,6 +104,59 @@ class RoutePlannerTest {
         val elapsed = System.currentTimeMillis() - started
         assertTrue(results.isNotEmpty())
         assertTrue("planning took $elapsed ms", elapsed < 5000)
+    }
+
+    @Test
+    fun `photography trips do not default to a beach extension`() {
+        val req = TripRequest(
+            destination = Destination.KENYA, month = 9, days = 10, adults = 4,
+            styles = setOf(TravelStyle.PHOTOGRAPHY), mustActivities = setOf("mara_balloon"),
+        )
+        val top = service.recommend(req).first()
+        assertFalse(top.stops.any { it.placeId == "diani" })
+        val beachLover = service.recommend(req.copy(mustPlaces = setOf("diani"))).first()
+        assertTrue(beachLover.stops.any { it.placeId == "diani" })
+    }
+
+    @Test
+    fun `transport titles follow the direction of travel`() {
+        val req = TripRequest(
+            destination = Destination.CHINA, month = 10, days = 9, adults = 2,
+            mustPlaces = setOf("guangzhou", "guilin", "shanghai"),
+        )
+        service.recommend(req).forEach { itn ->
+            val names = itn.stops.map { TestFixtures.kb.place(it.placeId).name.zh }
+            val legs = itn.components.filter { it.type == ComponentType.DOMESTIC_TRANSPORT }.map { it.title.zh }
+            legs.forEach { title ->
+                val (from, to) = title.substringAfter(" ").split(" – ")
+                val i = names.indexOf(from)
+                assertTrue("$title vs $names", i >= 0 && names.getOrNull(i + 1) == to)
+            }
+        }
+    }
+
+    @Test
+    fun `cities without international flights connect through a hub`() {
+        val req = TripRequest(
+            destination = Destination.CHINA, month = 12, days = 9, adults = 2,
+            styles = setOf(TravelStyle.BUSINESS), mustPlaces = setOf("yiwu", "guilin"),
+        )
+        val results = service.recommend(req)
+        assertTrue(results.isNotEmpty())
+        results.forEach { itn ->
+            assertTrue(itn.stops.any { it.placeId == "yiwu" } && itn.stops.any { it.placeId == "guilin" })
+            val first = itn.days.first().items.first { it.type == ItemType.FLIGHT }
+            val last = itn.days.last().items.last { it.type == ItemType.FLIGHT }
+            assertTrue(first.title.en, listOf("Guangzhou", "Shanghai", "Beijing").any { first.title.en.contains("Arrive in $it") })
+            assertTrue(last.title.en, listOf("Guangzhou", "Shanghai", "Beijing").any { last.title.en.contains("Fly home from $it") })
+        }
+    }
+
+    @Test
+    fun `nairobi arrival day includes an activity`() {
+        val results = service.recommend(familyAugust.copy(mustPlaces = setOf("nairobi")))
+        val itn = results.first { it.stops.first().placeId == "nairobi" }
+        assertTrue(itn.days.first().items.any { it.type == ItemType.ACTIVITY })
     }
 
     @Test

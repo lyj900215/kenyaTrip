@@ -89,6 +89,13 @@ class RequestParserTest {
     }
 
     @Test
+    fun `chinese usd budget for canton fair`() {
+        val r = parser.parse("10月广交会，7天，3位采购商，每人2500美元", Destination.CHINA).request
+        assertEquals(3, r.adults)
+        assertEquals(2500, r.budgetPerPersonUsd)
+    }
+
+    @Test
     fun `empty input falls back to defaults`() {
         val result = parser.parse("", Destination.KENYA)
         assertEquals(12, result.request.month)
